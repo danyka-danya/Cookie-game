@@ -50,10 +50,18 @@ document.currentScript.after(_l);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden}
+html{background:#FFCF5C} /* safe-area-inset-bottom fill — golden, не белый */
 body{
   font-family:'Nunito',sans-serif;
   background:linear-gradient(180deg,#B68B5A 0%,#E0C898 30%,#F5E6CA 100%);
   color:var(--txt);position:fixed;display:flex;flex-direction:column;
+}
+/* Гарантированная золотая полоса под home-indicator — поверх всего */
+body::after{
+  content:'';position:fixed;left:0;right:0;bottom:0;
+  height:env(safe-area-inset-bottom,0px);
+  background:linear-gradient(180deg,#FFCF5C,#E5A632);
+  z-index:31;pointer-events:none;
 }
 
 #bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
@@ -68,6 +76,7 @@ body{
   padding-top:calc(var(--safe-top) + 6px);
   box-shadow:0 4px 18px rgba(0,0,0,.32);
   min-height:calc(var(--safe-top) + 64px);
+  contain:layout style; /* изоляция перерисовки шапки */
 }
 #header::after{
   content:'';position:absolute;left:0;right:0;bottom:-6px;height:6px;
@@ -251,6 +260,7 @@ body.skin-rainbow #cookie-img{animation:rainbowImgPulse 3s ease-in-out infinite}
   display:flex;align-items:stretch;
   flex-shrink:0;overflow:hidden;
   position:relative;
+  contain:layout style paint; /* полная изоляция — overflow:hidden уже есть */
 }
 #panel-handle::before{
   content:'';position:absolute;top:7px;left:50%;transform:translateX(-50%);
@@ -316,8 +326,9 @@ body.skin-rainbow #cookie-img{animation:rainbowImgPulse 3s ease-in-out infinite}
   border-left:2px solid var(--border);border-right:2px solid var(--border);
   height:var(--panel-body-h);
   display:flex;flex-direction:column;overflow:hidden;
+  contain:layout style paint;
 }
-#tab-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px 24px}
+#tab-content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 12px calc(24px + env(safe-area-inset-bottom,0px))}
 .tab-pane{display:none}
 .tab-pane.active{display:block}
 
@@ -1482,9 +1493,13 @@ function getAutoTheme(){
 }
 function effectiveTheme(){return (typeof G!=='undefined'&&G.theme&&G.theme!=='auto')?G.theme:getAutoTheme()}
 let currentBgEmojis=THEMES.classic.emojis.slice();
+let _appliedThemeName='';
 function applyTheme(){
   const t=effectiveTheme();
-  document.body.className=document.body.className.replace(/\bt-\w+\b/g,'').trim()+' t-'+t;
+  if(t===_appliedThemeName)return;
+  _appliedThemeName=t;
+  document.body.classList.remove('t-classic','t-halloween','t-newyear','t-spring','t-summer');
+  document.body.classList.add('t-'+t);
   currentBgEmojis=THEMES[t].emojis.slice();
 }
 
@@ -1493,8 +1508,9 @@ function applyTheme(){
 // ═══════════════════════════════════════════════════════════════════════════
 (function(){
   const cv=document.getElementById('bg-canvas'),ctx=cv.getContext('2d');
+  const DPR=Math.min(devicePixelRatio||1,2);
   let W,H,parts=[];
-  function resize(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';ctx.scale(devicePixelRatio,devicePixelRatio)}
+  function resize(){W=cv.width=innerWidth*DPR;H=cv.height=innerHeight*DPR;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';ctx.setTransform(1,0,0,1,0,0);ctx.scale(DPR,DPR)}
   function mk(layer){
     const isBack=layer==='back';
     return{
@@ -1516,8 +1532,11 @@ function applyTheme(){
   for(let i=0;i<8;i++){const p=mk('back');p.y=Math.random()*innerHeight;p.life=Math.random()*p.maxL;p.a=Math.random()*p.maxA;parts.push(p)}
   for(let i=0;i<18;i++){const p=mk('front');p.y=Math.random()*innerHeight;p.life=Math.random()*p.maxL;p.a=Math.random()*p.maxA;parts.push(p)}
   function draw(){
+    if(document.hidden){
+      // вкладка скрыта — спим, не жжём батарею
+      setTimeout(draw,500);return;
+    }
     ctx.clearRect(0,0,innerWidth,innerHeight);
-    // sort by layer (back first)
     for(let i=parts.length-1;i>=0;i--){
       const p=parts[i];p.life++;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;
       if(p.a<p.maxA)p.a+=p.maxA*.015;
@@ -1541,18 +1560,22 @@ function applyTheme(){
 const crumbCv=document.getElementById('crumb-canvas');
 const crumbCtx=crumbCv.getContext('2d');
 let crumbs=[];
+const CANVAS_DPR=Math.min(devicePixelRatio||1,2); // декор не нуждается в 3×
 function crumbResize(){
-  crumbCv.width=innerWidth*devicePixelRatio;
-  crumbCv.height=innerHeight*devicePixelRatio;
+  crumbCv.width=innerWidth*CANVAS_DPR;
+  crumbCv.height=innerHeight*CANVAS_DPR;
   crumbCv.style.width=innerWidth+'px';
   crumbCv.style.height=innerHeight+'px';
   crumbCtx.setTransform(1,0,0,1,0,0);
-  crumbCtx.scale(devicePixelRatio,devicePixelRatio);
+  crumbCtx.scale(CANVAS_DPR,CANVAS_DPR);
 }
 crumbResize();window.addEventListener('resize',crumbResize);
 
+const CRUMB_MAX=180;
 function spawnCrumbs(x,y,n,isCrit){
   const colors=['#7A3500','#5C2A00','#3B1A00','#A0522D','#8B4513'];
+  // если крошек слишком много — дропаем старые
+  if(crumbs.length>CRUMB_MAX)crumbs.splice(0,crumbs.length-CRUMB_MAX+n);
   for(let i=0;i<n;i++){
     const ang=Math.random()*Math.PI*2;
     const sp=2.5+Math.random()*4.5;
@@ -1570,6 +1593,7 @@ function spawnCrumbs(x,y,n,isCrit){
       isCrit
     });
   }
+  ensureCrumbLoop();
 }
 function spawnConfetti(x,y,n){
   const colors=['#FF6B00','#FFD86B','#7B2FBE','#4CAF50','#E74C3C','#3498DB','#FFFFFF','#FF8FE0'];
@@ -1590,8 +1614,15 @@ function spawnConfetti(x,y,n){
       isConfetti:true
     });
   }
+  ensureCrumbLoop();
 }
+let crumbRafActive=false;
 function tickCrumbs(){
+  if(crumbs.length===0){
+    crumbCtx.clearRect(0,0,innerWidth,innerHeight);
+    crumbRafActive=false;
+    return; // выходим из RAF — экономия CPU/батареи
+  }
   crumbCtx.clearRect(0,0,innerWidth,innerHeight);
   for(let i=crumbs.length-1;i>=0;i--){
     const c=crumbs[i];
@@ -1617,7 +1648,11 @@ function tickCrumbs(){
   }
   requestAnimationFrame(tickCrumbs);
 }
-tickCrumbs();
+function ensureCrumbLoop(){
+  if(crumbRafActive)return;
+  crumbRafActive=true;
+  requestAnimationFrame(tickCrumbs);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  AUDIO ENGINE — brighter, faster, more layers
@@ -1626,8 +1661,12 @@ let audioCtx=null,sfxEnabled=true,musicEnabled=true,musicGain=null,musicStarted=
 function getACtx(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx}
 function ensureAudio(){const ctx=getACtx();if(ctx.state==='suspended')ctx.resume();if(!musicStarted){musicStarted=true;startMusic()}}
 
+let _lastCrunchAt=0;
 function playCrunch(){
   if(!sfxEnabled)return;
+  const now=performance.now();
+  if(now-_lastCrunchAt<35)return; // не чаще 28 раз/сек — щадит AudioContext на iOS
+  _lastCrunchAt=now;
   try{
     const ctx=getACtx();
     const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*.07),ctx.sampleRate);
@@ -2074,42 +2113,77 @@ function doRender(){
   else if(activeTab==='settings')renderThemeGrid();
 }
 
+// кэшируем DOM-ссылки один раз — не лукапим на каждый клик
+const DOM={
+  count:document.getElementById('count-number'),
+  clickPow:document.getElementById('click-power-disp'),
+  cpsBadge:document.getElementById('cps-badge'),
+  cpsVal:document.getElementById('cps-val'),
+  prBadge:document.getElementById('prestige-badge'),
+  prMulBadge:document.getElementById('prestige-mul-badge'),
+  multInfo:document.getElementById('multiplier-info'),
+  mulDisp:document.getElementById('mul-disp'),
+  prRing:document.getElementById('prestige-ring'),
+  cmInfo:document.getElementById('combo-info'),
+  cmBadge:document.getElementById('combo-badge'),
+  cmRing:document.getElementById('combo-ring'),
+  cmMul:document.getElementById('combo-mul'),
+  cmVal:document.getElementById('combo-val'),
+  brickWrap:document.getElementById('brick-count-wrap'),
+  brickNum:document.getElementById('brick-number'),
+  brickHint:document.getElementById('brick-unlock-hint'),
+  brickHintVal:document.getElementById('brick-hint-val'),
+};
+// кэшируем последние значения, чтобы не трогать DOM зря (браузер всё равно делал reflow)
+const _hdrCache={count:'',cp:'',cps:'',pr:'',cm:'',brick:'',cpsVis:null,prVis:null,cmVis:null,brickVis:null};
+let _brickTabsUnlocked=false;
 function renderHeader(){
-  document.getElementById('count-number').textContent=fmt(G.cookies);
-  document.getElementById('click-power-disp').textContent=fmt(G.clickPower*currentClickMul());
-  const cb=document.getElementById('cps-badge');
-  if(G.cps>0){cb.classList.add('visible');document.getElementById('cps-val').textContent=fmt(G.cps)}
-  else cb.classList.remove('visible');
-  const pb=document.getElementById('prestige-badge');
-  if(G.prestigeCount>0){pb.classList.add('visible');document.getElementById('prestige-mul-badge').textContent=G.prestigeMul.toFixed(1)}
-  else pb.classList.remove('visible');
-  const mi=document.getElementById('multiplier-info');
-  if(G.prestigeCount>0){mi.classList.add('visible');document.getElementById('mul-disp').textContent=G.prestigeMul.toFixed(1)}
-  else mi.classList.remove('visible');
-  document.getElementById('prestige-ring').className=G.prestigeCount>0?'visible':'';
-  // combo
-  const cmi=document.getElementById('combo-info');
-  const cmb=document.getElementById('combo-badge');
-  const cmr=document.getElementById('combo-ring');
-  if(comboMul>1.05){
-    cmi.classList.add('visible');document.getElementById('combo-mul').textContent=comboMul.toFixed(2);
-    cmb.classList.add('visible');document.getElementById('combo-val').textContent='×'+comboMul.toFixed(1);
-    cmr.classList.add('visible');
-  }else{
-    cmi.classList.remove('visible');cmb.classList.remove('visible');cmr.classList.remove('visible');
+  const cookies=fmt(G.cookies);
+  if(cookies!==_hdrCache.count){_hdrCache.count=cookies;DOM.count.textContent=cookies}
+  const cp=fmt(G.clickPower*currentClickMul());
+  if(cp!==_hdrCache.cp){_hdrCache.cp=cp;DOM.clickPow.textContent=cp}
+
+  const cpsVis=G.cps>0;
+  if(cpsVis!==_hdrCache.cpsVis){_hdrCache.cpsVis=cpsVis;DOM.cpsBadge.classList.toggle('visible',cpsVis)}
+  if(cpsVis){const v=fmt(G.cps);if(v!==_hdrCache.cps){_hdrCache.cps=v;DOM.cpsVal.textContent=v}}
+
+  const prVis=G.prestigeCount>0;
+  if(prVis!==_hdrCache.prVis){
+    _hdrCache.prVis=prVis;
+    DOM.prBadge.classList.toggle('visible',prVis);
+    DOM.multInfo.classList.toggle('visible',prVis);
+    DOM.prRing.className=prVis?'visible':'';
   }
-  // bricks
+  if(prVis){const v=G.prestigeMul.toFixed(1);if(v!==_hdrCache.pr){_hdrCache.pr=v;DOM.prMulBadge.textContent=v;DOM.mulDisp.textContent=v}}
+
+  const cmVis=comboMul>1.05;
+  if(cmVis!==_hdrCache.cmVis){
+    _hdrCache.cmVis=cmVis;
+    DOM.cmInfo.classList.toggle('visible',cmVis);
+    DOM.cmBadge.classList.toggle('visible',cmVis);
+    DOM.cmRing.classList.toggle('visible',cmVis);
+  }
+  if(cmVis){const v=comboMul.toFixed(2);if(v!==_hdrCache.cm){_hdrCache.cm=v;DOM.cmMul.textContent=v;DOM.cmVal.textContent='×'+comboMul.toFixed(1)}}
+
   if(G.bricksUnlocked){
-    document.getElementById('brick-count-wrap').classList.add('visible');
-    document.getElementById('brick-number').textContent=fmt(G.bricks);
-    document.getElementById('brick-unlock-hint').classList.remove('visible');
-    document.querySelectorAll('.brick-tab').forEach(b=>b.classList.add('unlocked'));
+    if(_hdrCache.brickVis!==true){
+      _hdrCache.brickVis=true;
+      DOM.brickWrap.classList.add('visible');
+      DOM.brickHint.classList.remove('visible');
+    }
+    if(!_brickTabsUnlocked){
+      _brickTabsUnlocked=true;
+      document.querySelectorAll('.brick-tab').forEach(b=>b.classList.add('unlocked'));
+    }
+    const v=fmt(G.bricks);if(v!==_hdrCache.brick){_hdrCache.brick=v;DOM.brickNum.textContent=v}
   }else{
-    document.getElementById('brick-count-wrap').classList.remove('visible');
+    if(_hdrCache.brickVis!==false){
+      _hdrCache.brickVis=false;
+      DOM.brickWrap.classList.remove('visible');
+    }
     const rem=Math.max(0,BRICK_UNLOCK_AT-G.totalCookies);
-    const hint=document.getElementById('brick-unlock-hint');
-    if(rem>0){hint.classList.add('visible');document.getElementById('brick-hint-val').textContent=fmt(rem)}
-    else hint.classList.remove('visible');
+    if(rem>0){DOM.brickHint.classList.add('visible');DOM.brickHintVal.textContent=fmt(rem)}
+    else DOM.brickHint.classList.remove('visible');
   }
 }
 
@@ -2438,6 +2512,7 @@ function spawnFloat(x,y,val,cls,prefix){
   setTimeout(()=>el.remove(),900);
 }
 
+let _idleResumeTimer=null;
 function handleClickAt(cx,cy){
   lastClick=Date.now();
   ensureAudio();
@@ -2458,7 +2533,8 @@ function handleClickAt(cx,cy){
   const dy=(cy-(r.top+r.height/2))/r.height;
   cookieBtn.classList.remove('idle');
   cookieBtn.style.transform=`scale(0.92) rotate(${-dx*5}deg) translate(${-dx*4}px,${-dy*4}px)`;
-  setTimeout(()=>{cookieBtn.style.transform='';cookieBtn.classList.add('idle')},140);
+  if(_idleResumeTimer)clearTimeout(_idleResumeTimer);
+  _idleResumeTimer=setTimeout(()=>{cookieBtn.style.transform='';cookieBtn.classList.add('idle');_idleResumeTimer=null},140);
 
   if(isCrit){
     cookieBtn.classList.add('crit');
@@ -2976,9 +3052,12 @@ function getCookieStage(){
   for(let i=STAGE_THRESHOLDS.length-1;i>=0;i--){if(G.totalCookies>=STAGE_THRESHOLDS[i]){s=i;break}}
   return s;
 }
+let _appliedStage=-1;
 function applyCookieStage(){
   const s=getCookieStage();
-  document.body.className=document.body.className.replace(/\bcookie-stage-\d+\b/g,'').trim();
+  if(s===_appliedStage)return;
+  _appliedStage=s;
+  document.body.classList.remove('cookie-stage-1','cookie-stage-2','cookie-stage-3','cookie-stage-4','cookie-stage-5');
   if(s>0)document.body.classList.add('cookie-stage-'+s);
   const badge=document.getElementById('stage-badge');
   if(s>0){badge.style.display='block';badge.textContent=STAGE_LABELS[s]}
@@ -2997,16 +3076,20 @@ const SKINS=[
   {id:'diamond',name:'Алмазная',cost:5,icon:'💎'},
   {id:'rainbow',name:'Радужная',cost:8,icon:'🌈'},
 ];
+let _appliedSkin='';
 function applySkin(){
-  document.body.className=document.body.className.replace(/\bskin-\w+\b/g,'').trim();
-  document.body.classList.add('skin-'+(G.skinId||'classic'));
+  const sid=G.skinId||'classic';
+  if(sid===_appliedSkin)return;
+  _appliedSkin=sid;
+  document.body.classList.remove('skin-classic','skin-golden','skin-gingerbread','skin-pumpkin','skin-snow','skin-diamond','skin-rainbow');
+  document.body.classList.add('skin-'+sid);
   const img=document.getElementById('cookie-img');
   const btn=document.getElementById('cookie-btn');
   if(img&&btn){
     btn.classList.remove('skin-image');
     img.onload=()=>btn.classList.add('skin-image');
     img.onerror=()=>btn.classList.remove('skin-image');
-    img.src='assets/skins/'+(G.skinId||'classic')+'.webp';
+    img.src='assets/skins/'+sid+'.webp';
   }
 }
 function buySkin(s){
@@ -3129,11 +3212,10 @@ function missionProgress(kind,inc){
     if(m.id===kind||(kind==='clicks'&&m.id==='click_burst')){
       m.progress=Math.min(m.target,(m.progress||0)+inc);
       touched=true;
-    }else if(kind==='clicks_total'&&m.id==='click_burst'){
-      // alias
     }
   }
-  if(touched&&activeTab==='powerups')renderMissions();
+  // только когда панель ОТКРЫТА — иначе пересчёт DOM на каждый клик
+  if(touched&&activeTab==='powerups'&&panelOpen)renderMissions();
 }
 function setMissionProgress(kind,value){
   if(!G.missions||G.missions.length===0)return;
@@ -3143,7 +3225,7 @@ function setMissionProgress(kind,value){
       m.progress=Math.min(m.target,Math.max(m.progress||0,value));
     }
   }
-  if(activeTab==='powerups')renderMissions();
+  if(activeTab==='powerups'&&panelOpen)renderMissions();
 }
 function claimMission(idx){
   const m=G.missions[idx];if(!m||m.claimed||m.progress<m.target)return;
@@ -3464,21 +3546,20 @@ setInterval(()=>{
 // ═══════════════════════════════════════════════════════════════════════════
 //  STATS / HEADER UPDATES
 // ═══════════════════════════════════════════════════════════════════════════
-const _origRenderHeader=renderHeader;
 let _lastMasteryBonus=-1;
-renderHeader=function(){
-  // recalc clickPower so mastery bonus reflects latest achievements
+function refreshMasteryAndStage(){
   const bonus=getMasteryBonus();
   if(bonus!==_lastMasteryBonus){
     _lastMasteryBonus=bonus;
     recalcClickPower();
+    const mb=document.getElementById('mastery-badge');
+    if(bonus>0){mb.classList.add('visible');document.getElementById('mastery-val').textContent=bonus.toFixed(1)}
+    else mb.classList.remove('visible');
   }
-  _origRenderHeader();
-  const mb=document.getElementById('mastery-badge');
-  if(bonus>0){mb.classList.add('visible');document.getElementById('mastery-val').textContent=bonus.toFixed(1)}
-  else mb.classList.remove('visible');
-  applyCookieStage();
-};
+  applyCookieStage(); // cached, no-op when stage unchanged
+}
+// дешёвый пересчёт раз в 2 секунды вместо каждого клика
+setInterval(refreshMasteryAndStage,2000);
 
 const _origRenderStats=renderStats;
 renderStats=function(){
@@ -3525,6 +3606,26 @@ scheduleNextRain();
 setInterval(maybeStartRain,30000);
 if(G.bossPendingThreshold>0)bossIconEl.classList.add('show');
 doRender();
+
+// ── Preload остальных скинов в idle, чтобы переключение было мгновенным ──
+(function preloadSkins(){
+  const ALL=['classic','golden','gingerbread','pumpkin','snow','diamond','rainbow'];
+  const cur=G.skinId||'classic';
+  const queue=ALL.filter(id=>id!==cur);
+  function loadOne(){
+    const id=queue.shift();
+    if(!id)return;
+    const img=new Image();
+    img.onload=img.onerror=()=>schedule(loadOne);
+    img.src='assets/skins/'+id+'.webp';
+  }
+  function schedule(fn){
+    if(typeof requestIdleCallback==='function')requestIdleCallback(fn,{timeout:3000});
+    else setTimeout(fn,300);
+  }
+  // первая загрузка через 4 сек после старта — отдаём приоритет первому рендеру
+  setTimeout(()=>schedule(loadOne),4000);
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SERVICE WORKER — offline cache
