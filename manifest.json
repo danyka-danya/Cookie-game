@@ -1,0 +1,18 @@
+{
+  "name": "Печенька",
+  "short_name": "Печенька",
+  "description": "Кликер с печеньками 🍪",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#5B2400",
+  "theme_color": "#5B2400",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48ZGVmcz48cmFkaWFsR3JhZGllbnQgaWQ9ImcxIiBjeD0iMzglIiBjeT0iMzIlIiByPSI2NSUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNGNUM1NzgiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iI0Q0ODkwQSIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzdBM0EwQSIvPjwvcmFkaWFsR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iMTEyIiBmaWxsPSIjRkRGMERDIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMTAiIGZpbGw9InVybCgjZzEpIi8+PGVsbGlwc2UgY3g9IjE5NSIgY3k9IjIwMiIgcng9IjI4IiByeT0iMjMiIGZpbGw9IiMyQTBEMDAiIHRyYW5zZm9ybT0icm90YXRlKC0xNSwxOTUsMjAyKSIvPjxlbGxpcHNlIGN4PSIzMTgiIGN5PSIxNzgiIHJ4PSIyNSIgcnk9IjIwIiBmaWxsPSIjMkEwRDAwIiB0cmFuc2Zvcm09InJvdGF0ZSgxMCwzMTgsMTc4KSIvPjxlbGxpcHNlIGN4PSIzNjgiIGN5PSIyOTgiIHJ4PSIyNiIgcnk9IjIxIiBmaWxsPSIjMkEwRDAwIiB0cmFuc2Zvcm09InJvdGF0ZSgtOCwzNjgsMjk4KSIvPjxlbGxpcHNlIGN4PSIzMDYiIGN5PSIzNjUiIHJ4PSIyOCIgcnk9IjIzIiBmaWxsPSIjMkEwRDAwIiB0cmFuc2Zvcm09InJvdGF0ZSgxMiwzMDYsMzY1KSIvPjxlbGxpcHNlIGN4PSIxNzgiIGN5PSIzNDAiIHJ4PSIyNSIgcnk9IjIwIiBmaWxsPSIjMkEwRDAwIiB0cmFuc2Zvcm09InJvdGF0ZSgtNSwxNzgsMzQwKSIvPjxlbGxpcHNlIGN4PSIyNTYiIGN5PSIyNTgiIHJ4PSIyMyIgcnk9IjIwIiBmaWxsPSIjMkEwRDAwIiB0cmFuc2Zvcm09InJvdGF0ZSgyMCwyNTYsMjU4KSIvPjwvc3ZnPg==",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
