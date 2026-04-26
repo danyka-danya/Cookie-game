@@ -1,6 +1,6 @@
 // Service Worker — офлайн-кэш печеньки
-// v7: split на отдельные файлы (HTML + CSS + 4 JS)
-const CACHE = 'pechenko-v7';
+// v8: убрал белую тарелку и серый квадрат вокруг скина
+const CACHE = 'pechenko-v8';
 const PRE_CACHE = [
   './',
   './index.html',
