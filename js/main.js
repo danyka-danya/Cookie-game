@@ -20,6 +20,7 @@ let G = {
   theme:'auto',
   activeBoosts:[],
   cpsRecord:0,
+  totalCookiesAtLastPrestige:0,
   skinId:'classic', skinsOwned:['classic'],
   lastLoginDay:'', loginStreak:0, bestStreak:0, streakClaimedDay:'',
   missionDay:'', missions:[], missionsClaimed:0,
@@ -73,6 +74,7 @@ function load(){
       if (typeof G.rainsCaught !== 'number') G.rainsCaught = 0;
       if (typeof G.rainCookiesCollected !== 'number') G.rainCookiesCollected = 0;
       if (typeof G.nextRainAt !== 'number') G.nextRainAt = 0;
+      if (typeof G.totalCookiesAtLastPrestige !== 'number') G.totalCookiesAtLastPrestige = 0;
       // Migrate goldenBoostUntil → activeBoosts
       if (typeof parsed.goldenBoostUntil === 'number' && parsed.goldenBoostUntil > Date.now()){
         G.activeBoosts.push({id:'golden', name:'Золотая печ.', icon:'🌟', type:'click', mul:7, untilTs: parsed.goldenBoostUntil});
@@ -369,14 +371,29 @@ function renderAchievements(){
   });
 }
 
+// прогрессивный порог: 1М, 3М, 9М, 27М, 81М, 243М...
+function nextPrestigeThreshold(){
+  return Math.floor(PRESTIGE_THRESHOLD * Math.pow(3, G.prestigeCount));
+}
+function cookiesSinceLastPrestige(){
+  return Math.max(0, G.totalCookies - (G.totalCookiesAtLastPrestige||0));
+}
+function canPrestige(){
+  return cookiesSinceLastPrestige() >= nextPrestigeThreshold();
+}
 function renderPrestige(){
   document.getElementById('prestige-count-disp').textContent = G.prestigeCount;
   document.getElementById('prestige-mul-disp').textContent = '×' + G.prestigeMul.toFixed(1);
   const btn = document.getElementById('prestige-btn'), sub = document.getElementById('prestige-btn-sub');
-  const can = G.totalCookies >= PRESTIGE_THRESHOLD;
+  const need = nextPrestigeThreshold();
+  const have = cookiesSinceLastPrestige();
+  const can = have >= need;
   btn.disabled = !can;
-  sub.textContent = can ? 'Получить ×' + (G.prestigeMul + PRESTIGE_ADD).toFixed(1)
-                        : 'Нужно ещё ' + fmt(PRESTIGE_THRESHOLD - G.totalCookies);
+  sub.textContent = can
+    ? 'Получить ×' + (G.prestigeMul + PRESTIGE_ADD).toFixed(1)
+    : fmt(have) + ' / ' + fmt(need);
+  const nr = document.getElementById('prestige-need-row');
+  if (nr) nr.textContent = 'Нужно: ' + fmt(need) + ' печенек (с прошлого перерождения)';
 }
 
 function renderStats(){
@@ -661,7 +678,7 @@ setInterval(() => {
 
 // ── PRESTIGE ────────────────────────────────────────────────────────────
 document.getElementById('prestige-btn').addEventListener('click', () => {
-  if (G.totalCookies < PRESTIGE_THRESHOLD) return;
+  if (!canPrestige()) return;
   document.getElementById('overlay-new-mul').textContent = '×' + (G.prestigeMul + PRESTIGE_ADD).toFixed(1);
   document.getElementById('prestige-overlay').classList.add('show');
 });
@@ -672,6 +689,7 @@ document.getElementById('overlay-confirm').addEventListener('click', () => {
   G.prestigeCount++;
   G.prestigeMul = 1.0 + G.prestigeCount * PRESTIGE_ADD;
   G.prestigePoints = (G.prestigePoints||0) + 1;
+  G.totalCookiesAtLastPrestige = G.totalCookies; // фиксируем для следующего порога
   G.cookies = 0; G.upgrades = {}; G.shop = {};
   G.activeBoosts = []; G.bossPendingThreshold = 0;
   bossIconEl.classList.remove('show');
@@ -719,6 +737,7 @@ document.getElementById('confirm-reset').addEventListener('click', () => {
     missionDay:'', missions:[], missionsClaimed:0,
     petLevel:0,
     rainsCaught:0, rainCookiesCollected:0, nextRainAt:0,
+    totalCookiesAtLastPrestige:0,
   };
   prevUpgradeState = ''; prevShopState = '';
   bossIconEl.classList.remove('show');
@@ -1018,8 +1037,7 @@ function makeSkinTransparent(skinId){
   if (_skinTransparentCache[skinId]) return Promise.resolve(_skinTransparentCache[skinId]);
   return new Promise((resolve, reject) => {
     const src = new Image();
-    // GitHub Pages — same-origin, CORS не нужен, но ставим на всякий
-    src.crossOrigin = 'anonymous';
+    // НЕ ставим crossOrigin — same-origin, иначе SW может блокировать
     src.onload = () => {
       try {
         const c = document.createElement('canvas');
@@ -1029,16 +1047,15 @@ function makeSkinTransparent(skinId){
         ctx.drawImage(src, 0, 0);
         const imgData = ctx.getImageData(0, 0, c.width, c.height);
         const d = imgData.data;
-        // Каждый пиксель: если близок к белому — делаем прозрачным
-        // (мягкий градиент от 220 до 250 для плавных краёв)
+        // Агрессивное удаление белого: всё что светлее 230 — прозрачное,
+        // 200-230 — плавный fade (анти-ореол)
         for (let i = 0; i < d.length; i += 4){
           const r = d[i], g = d[i+1], b = d[i+2];
           const minC = Math.min(r, g, b);
-          if (minC >= 250) {
-            d[i+3] = 0; // полностью прозрачный
-          } else if (minC >= 220) {
-            // плавный alpha-fade на границе цвет→белый, чтобы не было ореола
-            const fade = (minC - 220) / 30;
+          if (minC >= 230) {
+            d[i+3] = 0;
+          } else if (minC >= 200) {
+            const fade = (minC - 200) / 30;
             d[i+3] = Math.round(d[i+3] * (1 - fade));
           }
         }
