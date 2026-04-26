@@ -1,6 +1,6 @@
 // Service Worker — офлайн-кэш печеньки
-// v9: canvas-обработка скинов — белый фон → прозрачный
-const CACHE = 'pechenko-v9';
+// v10: тарелка убрана + прогрессивный prestige (1М, 3М, 9М...)
+const CACHE = 'pechenko-v10';
 const PRE_CACHE = [
   './',
   './index.html',
