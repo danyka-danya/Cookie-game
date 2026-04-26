@@ -1012,7 +1012,49 @@ function applyCookieStage(){
   else badge.style.display = 'none';
 }
 
-// ── SKIN ────────────────────────────────────────────────────────────────
+// ── SKIN: обработка через canvas — белый BG → прозрачный ────────────────
+const _skinTransparentCache = {}; // skinId → blob URL уже обработанный
+function makeSkinTransparent(skinId){
+  if (_skinTransparentCache[skinId]) return Promise.resolve(_skinTransparentCache[skinId]);
+  return new Promise((resolve, reject) => {
+    const src = new Image();
+    // GitHub Pages — same-origin, CORS не нужен, но ставим на всякий
+    src.crossOrigin = 'anonymous';
+    src.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = src.naturalWidth;
+        c.height = src.naturalHeight;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(src, 0, 0);
+        const imgData = ctx.getImageData(0, 0, c.width, c.height);
+        const d = imgData.data;
+        // Каждый пиксель: если близок к белому — делаем прозрачным
+        // (мягкий градиент от 220 до 250 для плавных краёв)
+        for (let i = 0; i < d.length; i += 4){
+          const r = d[i], g = d[i+1], b = d[i+2];
+          const minC = Math.min(r, g, b);
+          if (minC >= 250) {
+            d[i+3] = 0; // полностью прозрачный
+          } else if (minC >= 220) {
+            // плавный alpha-fade на границе цвет→белый, чтобы не было ореола
+            const fade = (minC - 220) / 30;
+            d[i+3] = Math.round(d[i+3] * (1 - fade));
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        c.toBlob(blob => {
+          if (!blob) { reject('no blob'); return; }
+          const url = URL.createObjectURL(blob);
+          _skinTransparentCache[skinId] = url;
+          resolve(url);
+        }, 'image/png');
+      } catch(e){ reject(e); }
+    };
+    src.onerror = reject;
+    src.src = 'assets/skins/' + skinId + '.webp';
+  });
+}
 let _appliedSkin = '';
 function applySkin(){
   const sid = G.skinId || 'classic';
@@ -1022,12 +1064,16 @@ function applySkin(){
   document.body.classList.add('skin-' + sid);
   const img = document.getElementById('cookie-img');
   const btn = document.getElementById('cookie-btn');
-  if (img && btn){
-    btn.classList.remove('skin-image');
-    img.onload  = () => btn.classList.add('skin-image');
-    img.onerror = () => btn.classList.remove('skin-image');
+  if (!img || !btn) return;
+  btn.classList.remove('skin-image');
+  makeSkinTransparent(sid).then(url => {
+    img.src = url;
+    img.onload = () => btn.classList.add('skin-image');
+  }).catch(() => {
+    // фоллбэк: если canvas-обработка отвалилась (CORS/etc), показываем как есть
+    img.onload = () => btn.classList.add('skin-image');
     img.src = 'assets/skins/' + sid + '.webp';
-  }
+  });
 }
 function buySkin(s){
   if (G.skinsOwned.includes(s.id)) return;
