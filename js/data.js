@@ -6,20 +6,21 @@
 // ── Save / Game tuning ──────────────────────────────────────────────────
 const SAVE_KEY        = 'pechenko_v6';
 const SAVE_KEY_OLD    = 'pechenko_v5';
-const PRESTIGE_THRESHOLD = 1_000_000;
+const PRESTIGE_THRESHOLD = 5_000_000;          // 1-е перерождение: 5M
+const PRESTIGE_MUL_STEP  = 2.5;                // 5М → 12.5М → 31М → 78М → 195М
 const PRESTIGE_ADD    = 0.5;
-const BRICK_UNLOCK_AT = 50_000;
+const BRICK_UNLOCK_AT = 100_000;               // было 50к
 const CRIT_CHANCE     = 0.05;
 const CRIT_MUL        = 7;
 const COMBO_WINDOW_MS = 550;
 const COMBO_DECAY_MS  = 1500;
 const COMBO_PER_CLICK = 0.05;
-const COMBO_MAX       = 3.0;
-const CHEST_COOLDOWN  = 30 * 60 * 1000;       // 30 min
-const SPIN_COOLDOWN   = 24 * 60 * 60 * 1000;  // 24 h
+const COMBO_MAX       = 3.0;                   // базовый, прокачивается за 🌟
+const CHEST_COOLDOWN  = 30 * 60 * 1000;
+const SPIN_COOLDOWN   = 24 * 60 * 60 * 1000;
 const RAIN_MIN        = 90 * 60 * 1000;
 const RAIN_MAX        = 180 * 60 * 1000;
-const PET_MAX         = 10;
+const PET_MAX         = 15;                    // было 10
 const CRUMB_MAX       = 180;
 const CANVAS_DPR      = Math.min(devicePixelRatio || 1, 2);
 
@@ -64,15 +65,29 @@ const STAGE_THRESHOLDS = [0, 1e6, 5e6, 25e6, 100e6, 1e9];
 const STAGE_LABELS     = ['', '★ I','★ II','★ III','★ IV','★ V'];
 
 // ── UPGRADES (clicks) ───────────────────────────────────────────────────
+// requiresPrestige: 0 — доступно сразу; >0 — открывается после N перерождений
 const UPGRADES = [
-  { id:'u1', name:'Крепкий палец',   icon:'💪',     desc:'+1 печенька за клик',   cost:10,      costMul:2.5, maxLvl:10, add:1 },
-  { id:'u2', name:'Двойной удар',    icon:'✌️',     desc:'+3 печеньки за клик',   cost:80,      costMul:2.8, maxLvl:8,  add:3 },
-  { id:'u3', name:'Щедрая рука',     icon:'🖐️',     desc:'+8 печенек за клик',    cost:500,     costMul:3.0, maxLvl:6,  add:8 },
-  { id:'u4', name:'Мастер-пекарь',   icon:'👨‍🍳',     desc:'+20 печенек за клик',   cost:3000,    costMul:3.2, maxLvl:5,  add:20 },
-  { id:'u5', name:'Золотые руки',    icon:'✨',      desc:'+50 печенек за клик',   cost:15000,   costMul:3.5, maxLvl:4,  add:50 },
-  { id:'u6', name:'Алмазные пальцы', icon:'💎',     desc:'+100 печенек за клик',  cost:80000,   costMul:3.8, maxLvl:5,  add:100 },
-  { id:'u7', name:'Космо-кулак',     icon:'🚀',     desc:'+250 печенек за клик',  cost:400000,  costMul:4.0, maxLvl:5,  add:250 },
-  { id:'u8', name:'Печенье-бог',     icon:'👑',     desc:'+800 печенек за клик',  cost:2500000, costMul:4.2, maxLvl:5,  add:800 },
+  { id:'u1',  name:'Крепкий палец',     icon:'💪',  desc:'+1 печенька за клик',     cost:10,           costMul:2.5, maxLvl:10, add:1 },
+  { id:'u2',  name:'Двойной удар',      icon:'✌️',  desc:'+3 печеньки за клик',     cost:80,           costMul:2.8, maxLvl:8,  add:3 },
+  { id:'u3',  name:'Щедрая рука',       icon:'🖐️',  desc:'+8 печенек за клик',      cost:500,          costMul:3.0, maxLvl:6,  add:8 },
+  { id:'u4',  name:'Мастер-пекарь',     icon:'👨‍🍳',  desc:'+20 печенек за клик',     cost:3000,         costMul:3.2, maxLvl:5,  add:20 },
+  { id:'u5',  name:'Золотые руки',      icon:'✨',   desc:'+50 печенек за клик',     cost:15000,        costMul:3.5, maxLvl:4,  add:50 },
+  { id:'u6',  name:'Алмазные пальцы',   icon:'💎',  desc:'+100 печенек за клик',    cost:80000,        costMul:3.8, maxLvl:5,  add:100 },
+  { id:'u7',  name:'Космо-кулак',       icon:'🚀',  desc:'+250 печенек за клик',    cost:400000,       costMul:4.0, maxLvl:5,  add:250 },
+  { id:'u8',  name:'Печенье-бог',       icon:'👑',  desc:'+800 печенек за клик',    cost:2500000,      costMul:4.2, maxLvl:5,  add:800 },
+  // PRESTIGE-LOCKED — открываются после N перерождений
+  { id:'u9',  name:'Звёздный палец',    icon:'🌟',  desc:'+2 000 печенек за клик',  cost:5000000,      costMul:3.5, maxLvl:5,  add:2000,   requiresPrestige:1 },
+  { id:'u10', name:'Лунный кулак',      icon:'🌙',  desc:'+5 000 печенек за клик',  cost:25000000,     costMul:3.7, maxLvl:5,  add:5000,   requiresPrestige:2 },
+  { id:'u11', name:'Солнечный удар',    icon:'☀️',  desc:'+15 000 печенек за клик', cost:150000000,    costMul:3.9, maxLvl:5,  add:15000,  requiresPrestige:3 },
+  { id:'u12', name:'Галактический клик',icon:'🌌',  desc:'+40 000 печенек за клик', cost:1000000000,   costMul:4.1, maxLvl:5,  add:40000,  requiresPrestige:4 },
+  { id:'u13', name:'Космический бог',   icon:'👁️',  desc:'+100 000 печенек за клик',cost:8000000000,   costMul:4.3, maxLvl:5,  add:100000, requiresPrestige:5 },
+];
+
+// ── COMBO UPGRADES (за престиж-очки 🌟) ─────────────────────────────────
+const COMBO_UPGRADES = [
+  { id:'cmax',   name:'Цепкие пальцы',   icon:'💪', desc:'+1 к максимуму комбо',     maxLvl:3, costStart:2, costStep:2, effect:'max'   },
+  { id:'cgrow',  name:'Быстрая реакция', icon:'⚡', desc:'+0.02 рост комбо за клик', maxLvl:3, costStart:1, costStep:1, effect:'grow'  },
+  { id:'cdecay', name:'Долгое эхо',      icon:'⏱️', desc:'+500мс на затухание',      maxLvl:3, costStart:1, costStep:1, effect:'decay' },
 ];
 
 // ── SHOP (passive) ──────────────────────────────────────────────────────

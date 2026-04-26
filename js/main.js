@@ -26,6 +26,7 @@ let G = {
   missionDay:'', missions:[], missionsClaimed:0,
   petLevel:0,
   rainsCaught:0, rainCookiesCollected:0, nextRainAt:0,
+  comboUpgrades:{},
 };
 
 // ── SAVE / LOAD ─────────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ function load(){
       if (typeof G.rainCookiesCollected !== 'number') G.rainCookiesCollected = 0;
       if (typeof G.nextRainAt !== 'number') G.nextRainAt = 0;
       if (typeof G.totalCookiesAtLastPrestige !== 'number') G.totalCookiesAtLastPrestige = 0;
+      if (!G.comboUpgrades || typeof G.comboUpgrades !== 'object') G.comboUpgrades = {};
       // Migrate goldenBoostUntil → activeBoosts
       if (typeof parsed.goldenBoostUntil === 'number' && parsed.goldenBoostUntil > Date.now()){
         G.activeBoosts.push({id:'golden', name:'Золотая печ.', icon:'🌟', type:'click', mul:7, untilTs: parsed.goldenBoostUntil});
@@ -94,11 +96,15 @@ function bProdCost(u){   return Math.floor(u.cost * Math.pow(u.costMul, G.brickP
 
 function getMasteryBonus(){
   const ach = ACHIEVEMENTS.filter(a => a.check(G)).length;
-  return Math.floor(ach / 5) * 0.1;
+  return Math.floor(ach / 5) * 0.15; // было 0.1 — теперь сильнее
 }
 function getPetCpsBonus(){
-  return 1 + (G.petLevel||0) * 0.05;
+  return 1 + (G.petLevel||0) * 0.08; // было 0.05 — теперь сильнее, +120% при максе
 }
+// Динамические значения комбо (база + апгрейды за 🌟)
+function getComboMax(){   return COMBO_MAX     + ((G.comboUpgrades||{}).cmax   || 0); }
+function getComboGrow(){  return COMBO_PER_CLICK + ((G.comboUpgrades||{}).cgrow  || 0) * 0.02; }
+function getComboDecay(){ return COMBO_DECAY_MS  + ((G.comboUpgrades||{}).cdecay || 0) * 500; }
 function recalcClickPower(){
   let b = 1;
   UPGRADES.forEach(u => { b += (G.upgrades[u.id]||0) * u.add; });
@@ -250,9 +256,11 @@ let prevShopState   = '';
 
 function renderUpgrades(){
   const state = UPGRADES.map(u => {
-    const lvl = G.upgrades[u.id]||0, maxed = lvl >= u.maxLvl, cost = upgradeCost(u), can = !maxed && G.cookies >= cost;
-    return `${lvl}:${can?1:0}:${maxed?1:0}`;
-  }).join('|') + '|' + Math.floor(G.cookies/100);
+    const locked = (u.requiresPrestige||0) > G.prestigeCount;
+    const lvl = G.upgrades[u.id]||0, maxed = lvl >= u.maxLvl, cost = upgradeCost(u);
+    const can = !locked && !maxed && G.cookies >= cost;
+    return `${lvl}:${can?1:0}:${maxed?1:0}:${locked?1:0}`;
+  }).join('|') + '|' + Math.floor(G.cookies/100) + '|p' + G.prestigeCount;
   if (state === prevUpgradeState) return;
   prevUpgradeState = state;
 
@@ -260,10 +268,25 @@ function renderUpgrades(){
   list.innerHTML = '';
   let aff = false;
   UPGRADES.forEach(u => {
-    const lvl = G.upgrades[u.id]||0, maxed = lvl >= u.maxLvl, cost = upgradeCost(u), can = !maxed && G.cookies >= cost;
+    const locked = (u.requiresPrestige||0) > G.prestigeCount;
+    const lvl = G.upgrades[u.id]||0, maxed = lvl >= u.maxLvl, cost = upgradeCost(u);
+    const can = !locked && !maxed && G.cookies >= cost;
     if (can) aff = true;
     const div = document.createElement('div');
-    div.className = 'item-card' + (can?' affordable':'') + (maxed?' maxed':'');
+    div.className = 'item-card' + (can?' affordable':'') + (maxed?' maxed':'') + (locked?' locked':'');
+    let costHtml, btnHtml;
+    if (locked){
+      const need = u.requiresPrestige;
+      const word = need === 1 ? 'перерождение' : (need < 5 ? 'перерождения' : 'перерождений');
+      costHtml = `🔒 Нужно ${need} ${word}`;
+      btnHtml = `<button class="buy-btn" disabled>🔒 Закрыто</button>`;
+    } else if (maxed){
+      costHtml = '★ Макс';
+      btnHtml = `<button class="buy-btn" disabled>Куплено</button>`;
+    } else {
+      costHtml = '🍪 ' + fmt(cost);
+      btnHtml = `<button class="buy-btn" ${can?'':'disabled'} data-id="${u.id}">Купить</button>`;
+    }
     div.innerHTML = `<div class="item-icon">${u.icon}</div>
       <div class="item-info">
         <div class="item-name">${u.name}</div>
@@ -271,8 +294,8 @@ function renderUpgrades(){
         <div class="item-lvl">Уровень ${lvl}/${u.maxLvl}</div>
       </div>
       <div class="item-right">
-        <div class="item-cost ${can?'':'cant'}">${maxed?'★ Макс':'🍪 '+fmt(cost)}</div>
-        <button class="buy-btn" ${(!can||maxed)?'disabled':''} data-id="${u.id}">${maxed?'Куплено':'Купить'}</button>
+        <div class="item-cost ${can?'':'cant'}">${costHtml}</div>
+        ${btnHtml}
       </div>`;
     list.appendChild(div);
   });
@@ -371,9 +394,9 @@ function renderAchievements(){
   });
 }
 
-// прогрессивный порог: 1М, 3М, 9М, 27М, 81М, 243М...
+// прогрессивный порог: 5М, 12.5М, 31.25М, 78М, 195М, 488М, 1.2млрд...
 function nextPrestigeThreshold(){
-  return Math.floor(PRESTIGE_THRESHOLD * Math.pow(3, G.prestigeCount));
+  return Math.floor(PRESTIGE_THRESHOLD * Math.pow(PRESTIGE_MUL_STEP, G.prestigeCount));
 }
 // классическая механика: должно быть N печенек В КОШЕЛЬКЕ — потратишь их при перерождении
 function canPrestige(){
@@ -429,7 +452,11 @@ function renderStats(){
 }
 
 function updateNotifBadges(){
-  const hu = UPGRADES.some(u => { const l = G.upgrades[u.id]||0; return l < u.maxLvl && G.cookies >= upgradeCost(u); });
+  const hu = UPGRADES.some(u => {
+    if ((u.requiresPrestige||0) > G.prestigeCount) return false;
+    const l = G.upgrades[u.id]||0;
+    return l < u.maxLvl && G.cookies >= upgradeCost(u);
+  });
   const hs = SHOP.some(s => G.cookies >= shopCost(s));
   document.getElementById('hn-upgrades').className = 'hnotif' + (hu?' show':'');
   document.getElementById('hn-shop').className     = 'hnotif' + (hs?' show':'');
@@ -479,14 +506,14 @@ let comboDecayTimer = null;
 function bumpCombo(){
   const now = Date.now();
   if (now - lastClickTs < COMBO_WINDOW_MS){
-    comboMul = Math.min(COMBO_MAX, comboMul + COMBO_PER_CLICK);
+    comboMul = Math.min(getComboMax(), comboMul + getComboGrow());
     if (comboMul > G.maxCombo) G.maxCombo = comboMul;
   } else {
     comboMul = 1.0;
   }
   lastClickTs = now;
   if (comboDecayTimer) clearTimeout(comboDecayTimer);
-  comboDecayTimer = setTimeout(() => { comboMul = 1.0; scheduleRender(); }, COMBO_DECAY_MS);
+  comboDecayTimer = setTimeout(() => { comboMul = 1.0; scheduleRender(); }, getComboDecay());
 }
 function getBoostMuls(){
   const now = Date.now();
@@ -735,6 +762,7 @@ document.getElementById('confirm-reset').addEventListener('click', () => {
     petLevel:0,
     rainsCaught:0, rainCookiesCollected:0, nextRainAt:0,
     totalCookiesAtLastPrestige:0,
+    comboUpgrades:{},
   };
   prevUpgradeState = ''; prevShopState = '';
   bossIconEl.classList.remove('show');
@@ -1165,6 +1193,51 @@ function renderPet(){
   if (b && can) b.addEventListener('click', buyPet);
 }
 
+// ── COMBO UPGRADES (за престиж-очки) ────────────────────────────────────
+function comboUpgradeCost(u, lvl){ return u.costStart + lvl * u.costStep; }
+function buyComboUpgrade(uid){
+  const u = COMBO_UPGRADES.find(x => x.id === uid); if (!u) return;
+  const lvl = (G.comboUpgrades||{})[u.id] || 0;
+  if (lvl >= u.maxLvl) return;
+  const cost = comboUpgradeCost(u, lvl);
+  if ((G.prestigePoints||0) < cost) return;
+  G.prestigePoints -= cost;
+  if (!G.comboUpgrades) G.comboUpgrades = {};
+  G.comboUpgrades[u.id] = lvl + 1;
+  playUpgrade(); save(); renderComboUpgrades();
+  showRewardPopup(u.icon, u.name + ' прокачан!');
+}
+function renderComboUpgrades(){
+  const el = document.getElementById('combo-upgrades-pane');
+  if (!el) return;
+  if (G.prestigeCount === 0){
+    el.innerHTML = '<div class="no-boosts">🔒 Прокачка комбо открывается после первого перерождения</div>';
+    return;
+  }
+  el.innerHTML = COMBO_UPGRADES.map(u => {
+    const lvl = (G.comboUpgrades||{})[u.id] || 0;
+    const maxed = lvl >= u.maxLvl;
+    const cost = comboUpgradeCost(u, lvl);
+    const can = !maxed && (G.prestigePoints||0) >= cost;
+    return `<div class="item-card${can?' affordable':''}${maxed?' maxed':''}">
+      <div class="item-icon">${u.icon}</div>
+      <div class="item-info">
+        <div class="item-name">${u.name}</div>
+        <div class="item-desc">${u.desc}</div>
+        <div class="item-lvl">Уровень ${lvl}/${u.maxLvl}</div>
+      </div>
+      <div class="item-right">
+        <div class="item-cost ${can?'':'cant'}" style="color:var(--pp)">${maxed?'★ Макс':'🌟 '+cost}</div>
+        <button class="buy-btn pp" ${(!can||maxed)?'disabled':''} data-cid="${u.id}">${maxed?'Куплено':'Купить'}</button>
+      </div>
+    </div>`;
+  }).join('');
+  // делегируем клик
+  el.querySelectorAll('.buy-btn[data-cid]').forEach(b => {
+    b.addEventListener('click', () => buyComboUpgrade(b.dataset.cid));
+  });
+}
+
 // ── MISSIONS ────────────────────────────────────────────────────────────
 function generateMissions(){
   const pool = MISSION_TEMPLATES.slice();
@@ -1378,6 +1451,7 @@ function collectRainCookie(e, el){
 // ── POWERUPS TAB RENDER ─────────────────────────────────────────────────
 function renderPowerups(){
   renderMissions();
+  renderComboUpgrades();
   renderPet();
 
   const ab = document.getElementById('active-boosts-pane');
