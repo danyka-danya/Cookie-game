@@ -1,6 +1,6 @@
 // Service Worker — офлайн-кэш печеньки
-// v10: тарелка убрана + прогрессивный prestige (1М, 3М, 9М...)
-const CACHE = 'pechenko-v10';
+// v11: prestige покупается из кошелька (1М/3М/9М/27М...)
+const CACHE = 'pechenko-v11';
 const PRE_CACHE = [
   './',
   './index.html',
