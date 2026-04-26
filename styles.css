@@ -135,25 +135,19 @@ body::after{
 #cookie-btn svg{width:100%;height:100%;filter:drop-shadow(0 10px 26px rgba(60,30,0,.4))}
 #cookie-btn.crit svg{filter:drop-shadow(0 0 22px var(--gold-x)) drop-shadow(0 10px 26px rgba(60,30,0,.4))}
 #cookie-img{
-  position:absolute;left:-15%;top:-15%;width:130%;height:130%;
-  object-fit:cover;border-radius:50%;
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:contain;
   display:none;pointer-events:none;
+  filter:drop-shadow(0 10px 22px rgba(60,30,0,.35));
 }
 #cookie-btn.skin-image #cookie-img{display:block}
 #cookie-btn.skin-image svg{display:none}
-#cookie-btn.skin-image{box-shadow:0 10px 26px rgba(60,30,0,.35)}
-#cookie-btn.skin-image.crit{box-shadow:0 0 28px var(--gold-x),0 10px 26px rgba(60,30,0,.35)}
+#cookie-btn.skin-image{overflow:visible}
+#cookie-btn.skin-image.crit #cookie-img{filter:drop-shadow(0 0 22px var(--gold-x)) drop-shadow(0 10px 22px rgba(60,30,0,.35))}
 body.skin-rainbow #cookie-img{animation:rainbowImgPulse 3s ease-in-out infinite}
 @keyframes rainbowImgPulse{
-  0%,100%{filter:saturate(1)}
-  50%{filter:saturate(1.4)}
-}
-body.skin-rainbow #cookie-btn.skin-image{
-  animation:rainbowBtnGlow 3s ease-in-out infinite;
-}
-@keyframes rainbowBtnGlow{
-  0%,100%{box-shadow:0 10px 26px rgba(60,30,0,.35)}
-  50%{box-shadow:0 0 32px rgba(255,140,255,.7),0 10px 26px rgba(60,30,0,.35)}
+  0%,100%{filter:saturate(1) drop-shadow(0 10px 22px rgba(60,30,0,.35))}
+  50%{filter:saturate(1.5) drop-shadow(0 0 28px rgba(255,140,255,.6)) drop-shadow(0 10px 22px rgba(60,30,0,.35))}
 }
 @keyframes idleWobble{
   0%,100%{transform:rotate(-1deg)}

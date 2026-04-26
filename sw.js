@@ -1,6 +1,6 @@
 // Service Worker — офлайн-кэш печеньки
-// v8: убрал белую тарелку и серый квадрат вокруг скина
-const CACHE = 'pechenko-v8';
+// v9: canvas-обработка скинов — белый фон → прозрачный
+const CACHE = 'pechenko-v9';
 const PRE_CACHE = [
   './',
   './index.html',
