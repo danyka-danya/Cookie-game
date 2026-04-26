@@ -1,6 +1,6 @@
 // Service Worker — офлайн-кэш печеньки
-// v11: prestige покупается из кошелька (1М/3М/9М/27М...)
-const CACHE = 'pechenko-v11';
+// v12: 5М первый prestige, 5 prestige-only апгрейдов, прокачка комбо, питомец/мастерство сильнее
+const CACHE = 'pechenko-v12';
 const PRE_CACHE = [
   './',
   './index.html',

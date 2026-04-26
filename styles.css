@@ -312,6 +312,8 @@ body.skin-rainbow #cookie-img{animation:rainbowImgPulse 3s ease-in-out infinite}
 .item-card.affordable::before{background:var(--gold)}
 .item-card.maxed{opacity:.5}
 .item-card.maxed::before{background:#ccc}
+.item-card.locked{opacity:.55;filter:grayscale(.4)}
+.item-card.locked::before{background:var(--pp)}
 .item-card.brick-card.affordable{border-color:var(--brick);background:var(--brick-bg)}
 .item-card.brick-card.affordable::before{background:var(--brick)}
 
@@ -338,6 +340,7 @@ body.skin-rainbow #cookie-img{animation:rainbowImgPulse 3s ease-in-out infinite}
 .buy-btn:active{opacity:.75;transform:scale(.96)}
 .buy-btn:disabled{background:#ddd;color:#aaa;box-shadow:none}
 .buy-btn.bk{background:linear-gradient(135deg,var(--brick-l),var(--brick))}
+.buy-btn.pp{background:linear-gradient(135deg,var(--pl),var(--pp));box-shadow:0 2px 8px rgba(123,47,190,.4)}
 
 .section-title{
   font-family:'Unbounded',sans-serif;font-size:10px;color:var(--mid);
