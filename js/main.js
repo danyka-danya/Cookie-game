@@ -375,25 +375,23 @@ function renderAchievements(){
 function nextPrestigeThreshold(){
   return Math.floor(PRESTIGE_THRESHOLD * Math.pow(3, G.prestigeCount));
 }
-function cookiesSinceLastPrestige(){
-  return Math.max(0, G.totalCookies - (G.totalCookiesAtLastPrestige||0));
-}
+// классическая механика: должно быть N печенек В КОШЕЛЬКЕ — потратишь их при перерождении
 function canPrestige(){
-  return cookiesSinceLastPrestige() >= nextPrestigeThreshold();
+  return G.cookies >= nextPrestigeThreshold();
 }
 function renderPrestige(){
   document.getElementById('prestige-count-disp').textContent = G.prestigeCount;
   document.getElementById('prestige-mul-disp').textContent = '×' + G.prestigeMul.toFixed(1);
   const btn = document.getElementById('prestige-btn'), sub = document.getElementById('prestige-btn-sub');
   const need = nextPrestigeThreshold();
-  const have = cookiesSinceLastPrestige();
+  const have = G.cookies;
   const can = have >= need;
   btn.disabled = !can;
   sub.textContent = can
     ? 'Получить ×' + (G.prestigeMul + PRESTIGE_ADD).toFixed(1)
-    : fmt(have) + ' / ' + fmt(need);
+    : fmt(Math.floor(have)) + ' / ' + fmt(need);
   const nr = document.getElementById('prestige-need-row');
-  if (nr) nr.textContent = 'Нужно: ' + fmt(need) + ' печенек (с прошлого перерождения)';
+  if (nr) nr.textContent = 'Нужно: ' + fmt(need) + ' печенек в кошельке';
 }
 
 function renderStats(){
@@ -689,8 +687,7 @@ document.getElementById('overlay-confirm').addEventListener('click', () => {
   G.prestigeCount++;
   G.prestigeMul = 1.0 + G.prestigeCount * PRESTIGE_ADD;
   G.prestigePoints = (G.prestigePoints||0) + 1;
-  G.totalCookiesAtLastPrestige = G.totalCookies; // фиксируем для следующего порога
-  G.cookies = 0; G.upgrades = {}; G.shop = {};
+  G.cookies = 0; G.upgrades = {}; G.shop = {}; // печеньки потрачены на перерождение
   G.activeBoosts = []; G.bossPendingThreshold = 0;
   bossIconEl.classList.remove('show');
   if (bossFight){
